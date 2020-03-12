@@ -1,0 +1,27 @@
+[blind]
+current = "1.1"
+
+[girara]
+current = "0.3.4"
+primary = "gitlab_tags"
+gitlab = "pwmt/girara"
+url = "https://git.pwmt.org"
+
+[keyfinder-cli]
+current = "1.1.1"
+primary = "github_tags"
+github = "EvanPurkhiser/keyfinder-cli"
+
+[libkeyfinder]
+current = "2.2.1"
+primary = "github"
+github = "ibsh/libKeyFinder"
+
+[libspectre]
+current = "0.2.8"
+
+[py3-attrs]
+current = "19.3.0"
+primary = "github"
+github = "python-attrs/attrs"
+arch = "python-attrs"

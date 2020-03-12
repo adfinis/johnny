@@ -1,0 +1,8 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: johnny
+Upstream-Contact: Jean-Louis Fuchs <https://github.com/adfinis-sygroup/johnny>
+Source: https://github.com/adfinis-sygroup/johnny
+
+Files: README.md examples/deps.toml setup.py .gitignore
+Copyright: 2020 Adfinis-SyGroup
+License: CC0-1.0
