@@ -236,13 +236,24 @@ def get_vers(args, c):
     return vers, left
 
 
+defaults = {
+    "primary": True,
+    "secondary": True,
+    "trust_primary": True,
+    "trust_secondary": True,
+    "print_names": False,
+}
+
+
 def read_config(args, config):
     args = dict(args)
-    for k, v in config.items():
+    for k in config.keys():
         if k not in args:
             raise KeyError(k, "Unknown config")
-        else:
-            args[k] = v
+    for k, v in args.items():
+        if v is None:
+            args[k] = config.get(k, defaults[k])
+        assert args[k] is not None
     return args
 
 
@@ -250,19 +261,19 @@ def read_config(args, config):
 @click.argument("config", type=click.File("r", encoding="UTF-8"))
 @click.option("--github-token", type=click.STRING, help="github token")
 @click.option("--gitlab-token", type=click.STRING, help="gitlab token")
-@click.option("--primary/--no-primary", default=True, help="query primary sources")
-@click.option("--secondary/--no-secondary", default=True, help="query primary sources")
+@click.option("--primary/--no-primary", default=None, help="query primary sources")
+@click.option("--secondary/--no-secondary", default=None, help="query primary sources")
 @click.option(
-    "--trust-primary/--no-trust-primary", default=True, help="trust primary sources"
+    "--trust-primary/--no-trust-primary", default=None, help="trust primary sources"
 )
 @click.option(
     "--trust-secondary/--no-trust-secondary",
-    default=True,
+    default=None,
     help="trust secondary sources",
 )
 @click.option(
     "--print-names/--no-print-names",
-    default=False,
+    default=None,
     help="print package names instead of count",
 )
 def cli(config, **kwargs):
