@@ -4,6 +4,7 @@
 import json
 import sys
 from itertools import groupby
+from subprocess import check_output
 
 import click
 import requests
@@ -14,6 +15,25 @@ github_base = "https://api.github.com/repos"
 gitlab_base = "https://gitlab.com"
 arch_base = "https://www.archlinux.org/packages/search/json"
 aur_base = "https://aur.archlinux.org/rpc"
+
+
+def git(args, pkgs):
+    res = {}
+    for name, pkg in pkgs.items():
+        primary = pkg.get("primary")
+        base = pkg.get("url")
+        if base and primary == "git":
+            out = check_output(["git", "ls-remote", "--tags", base]).decode("UTF-8")
+            vers = set()
+            for line in out.splitlines():
+                _, _, tag = line.partition("\t")
+                tag = tag.split("/")[-1]
+                tag, _, _ = tag.partition("^")
+                vers.add(tag)
+            vers = try_parse_versions(vers)
+            if vers:
+                res[name] = vers[-1]
+    return res
 
 
 def gitlab(args, pkgs, type="releases", field="tag_name"):
@@ -95,6 +115,7 @@ sources_list = [github, gitlab, aur, arch]
 sources = {x.__name__: x for x in sources_list}
 sources["github_tags"] = github_tags
 sources["gitlab_tags"] = gitlab_tags
+sources["git"] = git
 
 
 def eprint(*args, **kwargs):
