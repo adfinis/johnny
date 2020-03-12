@@ -16,16 +16,23 @@ aur_base = "https://aur.archlinux.org/rpc"
 
 def gitlab(args, pkgs, type="releases", field="tag_name"):
     res = {}
+    arg_gitlab_token = args["gitlab_token"]
     for name, pkg in pkgs.items():
         id_ = pkg.get("gitlab")
         if id_:
             id_ = id_.replace("/", "%2F")
             base = pkg.get("url", gitlab_base)
-            r = requests.get(f"{base}/api/v4/projects/{id_}/{type}").json()
+            headers = {}
+            if arg_gitlab_token and base == github_base:
+                headers = {"Private-Token": f"token {arg_gitlab_token}"}
+            r = requests.get(
+                f"{base}/api/v4/projects/{id_}/{type}", headers=headers
+            ).json()
             if r:
                 vers = [x[field] for x in r if field in x]
                 vers = try_parse_versions(vers)
-                res[name] = vers[-1]
+                if vers:
+                    res[name] = vers[-1]
     return res
 
 
@@ -35,10 +42,10 @@ def gitlab_tags(args, pkgs):
 
 def github(args, pkgs, type="releases", field="tag_name"):
     res = {}
+    arg_github_token = args["github_token"]
     for name, pkg in pkgs.items():
         id_ = pkg.get("github")
         if id_:
-            arg_github_token = args["github_token"]
             headers = {}
             if arg_github_token:
                 headers = {"Authorization": f"token {arg_github_token}"}
@@ -191,6 +198,7 @@ def get_vers(args, c):
 @click.command()
 @click.argument("config", type=click.File("r", encoding="UTF-8"))
 @click.option("--github-token", type=click.STRING, help="github token")
+@click.option("--gitlab-token", type=click.STRING, help="gitlab token")
 @click.option("--primary/--no-primary", default=True, help="query primary sources")
 @click.option("--secondary/--no-secondary", default=True, help="query primary sources")
 @click.option(
