@@ -153,13 +153,19 @@ def make_serializable(s):
     return {k: str(v) for k, v in s.items()}
 
 
-def status(args, source, query, vers):
+def status(args, source, query, new, all):
     if args["print_names"]:
         squery = ", ".join(query)
-        svers = ", ".join(vers.keys())
-        eprint(f"Asking {source} for:\n    {squery}\nfound:\n    {svers}\n")
+        eprint(f"Asking {source} for:\n    {squery}")
+        if new:
+            snew = ", ".join(new.keys())
+            eprint(f"found:\n    {snew}, total: {all}\n")
+        else:
+            eprint(f"total: {all}\n")
     else:
-        eprint(f"Asking {source} for {len(query)} packages, found {len(vers)}")
+        eprint(
+            f"Asking {source} for {len(query)} packages, found {len(new)}, total: {all}"
+        )
 
 
 def get_primary(args, c, vers):
@@ -173,14 +179,16 @@ def get_primary(args, c, vers):
         x = dict(g)
         asked.add(k)
         s = sources[k]
-        vers = update(vers, s(args, x))
-        status(args, k, x, vers)
+        new = s(args, x)
+        vers = update(vers, new)
+        status(args, k, x, new, len(vers))
     return vers, asked
 
 
 def get_secondary_source(args, c, s, vers, left):
-    vers = update(vers, s(args, left))
-    status(args, s.__name__, left, vers)
+    new = s(args, left)
+    vers = update(vers, new)
+    status(args, s.__name__, left, new, len(vers))
     arg_trust_secondary = args["trust_secondary"]
     if arg_trust_secondary:
         return vers, {k: v for k, v in c.items() if k not in vers}
@@ -225,7 +233,7 @@ def get_vers(args, c):
     left = ", ".join([k for k in left.keys()])
     if left:
         eprint(f"Packages left: {left}")
-    return vers
+    return vers, left
 
 
 def read_config(args, config):
@@ -259,9 +267,14 @@ def read_config(args, config):
 )
 def cli(config, **kwargs):
     c = toml.load(config)
-    kwargs = read_config(kwargs, c.get("johnny_config", {}))
-    vers = get_vers(kwargs, c)
+    jc = c.get("johnny_config", {})
+    kwargs = read_config(kwargs, jc)
+    if jc:
+        del c["johnny_config"]
+    vers, left = get_vers(kwargs, c)
     print(json.dumps(make_serializable((vers))))
+    if left:
+        sys.exit(1)
 
 
 if __name__ == "__main__":
