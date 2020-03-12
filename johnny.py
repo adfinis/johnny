@@ -154,6 +154,8 @@ def make_serializable(s):
 
 
 def status(args, source, query, new, all):
+    if args["quiet"]:
+        return
     if args["print_names"]:
         squery = ", ".join(query)
         eprint(f"Asking {source} for:\n    {squery}")
@@ -242,6 +244,7 @@ defaults = {
     "trust_primary": True,
     "trust_secondary": True,
     "print_names": False,
+    "quiet": False,
 }
 
 
@@ -249,7 +252,7 @@ def read_config(args, config):
     args = dict(args)
     for k in config.keys():
         if k not in args:
-            raise KeyError(k, "Unknown config")
+            raise KeyError(k, "Unknown config option")
     for k, v in args.items():
         if v is None:
             args[k] = config.get(k, defaults[k])
@@ -257,7 +260,12 @@ def read_config(args, config):
     return args
 
 
-@click.command()
+@click.command(
+    help=(
+        "johnny - generic dep(p)endencies tracker\n\n"
+        "command-line options take precedence over config options"
+    )
+)
 @click.argument("config", type=click.File("r", encoding="UTF-8"))
 @click.option("--github-token", type=click.STRING, help="github token")
 @click.option("--gitlab-token", type=click.STRING, help="gitlab token")
@@ -275,6 +283,9 @@ def read_config(args, config):
     "--print-names/--no-print-names",
     default=None,
     help="print package names instead of count",
+)
+@click.option(
+    "--quiet/--no-quiet", default=None, help="do not print anything to stderr",
 )
 def cli(config, **kwargs):
     c = toml.load(config)
