@@ -1,4 +1,6 @@
+# SPDX-FileCopyrightText: 2020 Adfinis-SyGroup
 # SPDX-License-Identifier: AGPL-3.0-or-later
+
 import json
 import sys
 from itertools import groupby
