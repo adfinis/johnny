@@ -255,8 +255,7 @@ def read_config(args, config):
             raise KeyError(k, "Unknown config option")
     for k, v in args.items():
         if v is None:
-            args[k] = config.get(k, defaults[k])
-        assert args[k] is not None
+            args[k] = config.get(k, defaults.get(k))
     return args
 
 
