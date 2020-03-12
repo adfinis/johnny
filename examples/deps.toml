@@ -1,3 +1,6 @@
+[johnny_config]
+print_names = true
+
 [johnny]
 current = "0.1.2"
 primary = "git"

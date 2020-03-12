@@ -91,7 +91,9 @@ def arch(args, pkgs):
         r = requests.get(f"{arch_base}/?name={id_}").json()
         r = r["results"]
         if r:
-            res[name] = try_parse_versions([r[0]["pkgver"]])[0]
+            vers = try_parse_versions([r[0]["pkgver"]])
+            if vers:
+                res[name] = vers[0]
     return res
 
 
@@ -224,6 +226,16 @@ def get_vers(args, c):
     return vers
 
 
+def read_config(args, config):
+    args = dict(args)
+    for k, v in config.items():
+        if k not in args:
+            raise KeyError(k, "Unknown config")
+        else:
+            args[k] = v
+    return args
+
+
 @click.command()
 @click.argument("config", type=click.File("r", encoding="UTF-8"))
 @click.option("--github-token", type=click.STRING, help="github token")
@@ -245,6 +257,7 @@ def get_vers(args, c):
 )
 def cli(config, **kwargs):
     c = toml.load(config)
+    kwargs = read_config(kwargs, c.get("johnny_config", {}))
     vers = get_vers(kwargs, c)
     print(json.dumps(make_serializable((vers))))
 
