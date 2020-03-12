@@ -5,6 +5,8 @@ url = "https://github.com/adfinis-sygroup/johnny"
 
 [blind]
 current = "1.1"
+primary = "git"
+url = "git://git.suckless.org/blind"
 
 [girara]
 current = "0.3.4"
