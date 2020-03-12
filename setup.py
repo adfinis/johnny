@@ -17,7 +17,7 @@ URL = "https://github.com/adfinis-sygroup/johnny"
 EMAIL = "jean-louis.fuchs@adfinis-sygroup.ch"
 AUTHOR = "Jean-Louis Fuchs"
 REQUIRES_PYTHON = ">=3.6.0"
-VERSION = "0.1.0"
+VERSION = "0.1.1"
 
 # What packages are required for this module to be executed?
 REQUIRED = ["toml", "click", "requests"]
