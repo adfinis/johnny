@@ -1,8 +1,8 @@
 johnny - generic dep(p)endencies tracker
 ========================================
 
-Alerting stale dependencies, tool and language independent and without a central
-service.
+Tracking versions and alerting stale dependencies, Johnny is tool and language
+independent and doesn't need central service.
 
 Currently supports: git, gitlab (gitlab.com and self-hosted), github, arch and aur
 
