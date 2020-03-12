@@ -21,10 +21,9 @@ def gitlab(args, pkgs, type="releases", field="tag_name"):
         if id_:
             id_ = id_.replace("/", "%2F")
             base = pkg.get("url", gitlab_base)
-            r = requests.get(f"{base}/api/v4/projects/{id_}/{type}")
-            j = json.loads(r.text)
-            if j:
-                vers = [x[field] for x in j if field in x]
+            r = requests.get(f"{base}/api/v4/projects/{id_}/{type}").json()
+            if r:
+                vers = [x[field] for x in r if field in x]
                 vers = try_parse_versions(vers)
                 res[name] = vers[-1]
     return res
@@ -43,10 +42,9 @@ def github(args, pkgs, type="releases", field="tag_name"):
             headers = {}
             if arg_github_oauth:
                 headers = {"Authorization": f"token {arg_github_oauth}"}
-            r = requests.get(f"{github_base}/{id_}/{type}", headers=headers)
-            j = json.loads(r.text)
-            if j:
-                vers = [x[field] for x in j if field in x]
+            r = requests.get(f"{github_base}/{id_}/{type}", headers=headers).json()
+            if r:
+                vers = [x[field] for x in r if field in x]
                 vers = try_parse_versions(vers)
                 if vers:
                     res[name] = vers[-1]
@@ -61,9 +59,8 @@ def arch(args, pkgs):
     res = {}
     for name, pkg in pkgs.items():
         id_ = pkg.get("arch", name)
-        r = requests.get(f"{arch_base}/?name={id_}")
-        j = json.loads(r.text)
-        r = j["results"]
+        r = requests.get(f"{arch_base}/?name={id_}").json()
+        r = r["results"]
         if r:
             res[name] = try_parse_versions([r[0]["pkgver"]])[0]
     return res
@@ -76,9 +73,8 @@ def aur(args, pkgs):
         id_ = pkg.get("aur", name)
         query.append(f"arg[]={id_}")
     query = "&".join(query)
-    r = requests.get(f"{aur_base}/?v=5&type=info&{query}")
-    j = json.loads(r.text)
-    r = j["results"]
+    r = requests.get(f"{aur_base}/?v=5&type=info&{query}").json()
+    r = r["results"]
     res = {}
     for i, v in enumerate(r):
         if v:
