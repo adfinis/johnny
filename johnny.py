@@ -109,7 +109,9 @@ def aur(args, pkgs):
     res = {}
     for i, v in enumerate(r):
         if v:
-            res[items[i][0]] = try_parse_versions([v["Version"]])[0]
+            vers = try_parse_versions([v["Version"]])
+            if vers:
+                res[items[i][0]] = vers[0]
     return res
 
 
