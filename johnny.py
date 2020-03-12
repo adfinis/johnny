@@ -263,7 +263,8 @@ def read_config(args, config):
 @click.command(
     help=(
         "johnny - generic dep(p)endencies tracker\n\n"
-        "command-line options take precedence over config options"
+        "command-line options take precedence over config options.\n\n"
+        "tokens are only needed for high rate queries. (rate-limit)"
     )
 )
 @click.argument("config", type=click.File("r", encoding="UTF-8"))
