@@ -26,6 +26,8 @@ github = "ibsh/libKeyFinder"
 
 [libspectre]
 current = "0.2.8"
+primary = "git"
+url = "git://anongit.freedesktop.org/git/libspectre"
 
 [py3-attrs]
 current = "19.3.0"

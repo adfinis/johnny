@@ -149,8 +149,13 @@ def make_serializable(s):
     return {k: str(v) for k, v in s.items()}
 
 
-def status(source, query, vers):
-    eprint(f"Asking {source} for {len(query)} packages (current {len(vers)})")
+def status(args, source, query, vers):
+    if args["print_names"]:
+        squery = ", ".join(query)
+        svers = ", ".join(vers.keys())
+        eprint(f"Asking {source} for:\n    {squery}\nalready found:\n    {svers}\n")
+    else:
+        eprint(f"Asking {source} for {len(query)} packages, already found {len(vers)}")
 
 
 def get_primary(args, c, vers):
@@ -161,15 +166,16 @@ def get_primary(args, c, vers):
     asked = set()
     for k, g in primary:
         g = list(g)
-        status(k, g, vers)
+        x = dict(g)
+        status(args, k, x, vers)
         asked.add(k)
         s = sources[k]
-        vers = update(vers, s(args, dict(g)))
+        vers = update(vers, s(args, x))
     return vers, asked
 
 
 def get_secondary_source(args, c, s, vers, left):
-    status(s.__name__, left, vers)
+    status(args, s.__name__, left, vers)
     vers = update(vers, s(args, left))
     arg_trust_secondary = args["trust_secondary"]
     if arg_trust_secondary:
@@ -231,6 +237,11 @@ def get_vers(args, c):
     "--trust-secondary/--no-trust-secondary",
     default=True,
     help="trust secondary sources",
+)
+@click.option(
+    "--print-names/--no-print-names",
+    default=False,
+    help="print package names instead of count",
 )
 def cli(config, **kwargs):
     c = toml.load(config)
