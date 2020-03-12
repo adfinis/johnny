@@ -38,10 +38,10 @@ def github(args, pkgs, type="releases", field="tag_name"):
     for name, pkg in pkgs.items():
         id_ = pkg.get("github")
         if id_:
-            arg_github_oauth = args["github_oauth"]
+            arg_github_token = args["github_token"]
             headers = {}
-            if arg_github_oauth:
-                headers = {"Authorization": f"token {arg_github_oauth}"}
+            if arg_github_token:
+                headers = {"Authorization": f"token {arg_github_token}"}
             r = requests.get(f"{github_base}/{id_}/{type}", headers=headers).json()
             if r:
                 vers = [x[field] for x in r if field in x]
@@ -190,7 +190,7 @@ def get_vers(args, c):
 
 @click.command()
 @click.argument("config", type=click.File("r", encoding="UTF-8"))
-@click.option("--github-oauth", type=click.STRING, help="github oauth token")
+@click.option("--github-token", type=click.STRING, help="github token")
 @click.option("--primary/--no-primary", default=True, help="query primary sources")
 @click.option("--secondary/--no-secondary", default=True, help="query primary sources")
 @click.option(
