@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
 import json
+import re
 import sys
 from itertools import groupby
 from subprocess import check_output
@@ -10,6 +11,7 @@ import click
 import requests
 import toml
 from packaging import version
+from requests.exceptions import InvalidSchema
 
 github_base = "https://api.github.com/repos"
 gitlab_base = "https://gitlab.com"
@@ -17,6 +19,14 @@ arch_base = "https://www.archlinux.org/packages/search/json"
 aur_base = "https://aur.archlinux.org/rpc"
 
 session = requests.Session()
+tag_match = re.compile(r"^[0-9a-fA-F]+\s+refs/tags/([^/^]+)(\^\{\})?$")
+
+
+def git_get_version(line):
+    m = tag_match.match(line)
+    if m:
+        return m.group(1)
+    return None
 
 
 def git(args, pkgs):
@@ -25,13 +35,20 @@ def git(args, pkgs):
         primary = pkg.get("primary")
         base = pkg.get("url")
         if base and primary == "git":
-            out = check_output(["git", "ls-remote", "--tags", base]).decode("UTF-8")
             vers = set()
-            for line in out.splitlines():
-                _, _, tag = line.partition("\t")
-                tag = tag.split("/")[-1]
-                tag, _, _ = tag.partition("^")
-                vers.add(tag)
+            try:
+                r = session.get(f"{base}/info/refs?service=git-upload-pack")
+                for line in r.text.splitlines():
+                    tag = git_get_version(line)
+                    if tag:
+                        vers.add(tag)
+            except InvalidSchema:
+                eprint("Fallback to git-cli")
+                out = check_output(["git", "ls-remote", "--tags", base]).decode("UTF-8")
+                for line in out.splitlines():
+                    tag = git_get_version(line)
+                    if tag:
+                        vers.add(tag)
             vers = try_parse_versions(vers)
             if vers:
                 res[name] = vers[-1]
