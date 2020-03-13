@@ -8,6 +8,8 @@ Currently supports: git, gitlab (gitlab.com and self-hosted), github, arch and a
 
 For git please prefer git:// is supported, but please prefer https://
 
+Note!: Most git URLs end in ".git" (github/gitlab), but API URLs do not.
+
 Running
 -------
 

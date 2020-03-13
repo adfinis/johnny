@@ -4,7 +4,7 @@ print_names = true
 [johnny]
 current = "0.1.2"
 primary = "git"
-url = "https://github.com/adfinis-sygroup/johnny"
+url = "https://github.com/adfinis-sygroup/johnny.git"
 
 [blind]
 current = "1.1"
