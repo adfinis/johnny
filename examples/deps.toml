@@ -1,15 +1,20 @@
 [johnny_config]
 print_names = true
 
+[blind]
+current = "1.1"
+primary = "git"
+url = "https://git.suckless.org/blind"
+
 [johnny]
 current = "0.1.2"
 primary = "git"
 url = "https://github.com/adfinis-sygroup/johnny.git"
 
-[blind]
-current = "1.1"
+[libspectre]
+current = "0.2.8"
 primary = "git"
-url = "https://git.suckless.org/blind"
+url = "https://anongit.freedesktop.org/git/libspectre"
 
 [girara]
 current = "0.3.4"
@@ -26,11 +31,6 @@ github = "EvanPurkhiser/keyfinder-cli"
 current = "2.2.1"
 primary = "github"
 github = "ibsh/libKeyFinder"
-
-[libspectre]
-current = "0.2.8"
-primary = "git"
-url = "https://anongit.freedesktop.org/git/libspectre"
 
 [py3-attrs]
 current = "19.3.0"
