@@ -1,12 +1,14 @@
 # SPDX-FileCopyrightText: 2020 Adfinis-SyGroup
 # SPDX-License-Identifier: AGPL-3.0-or-later
 
+import asyncio
 import json
 import re
 import sys
 from itertools import groupby
 from subprocess import check_output
 
+import aiohttp
 import click
 import requests
 import toml
@@ -18,6 +20,7 @@ gitlab_base = "https://gitlab.com"
 arch_base = "https://www.archlinux.org/packages/search/json"
 aur_base = "https://aur.archlinux.org/rpc"
 
+asession = aiohttp.ClientSession()
 session = requests.Session()
 tag_match = re.compile(r"^[0-9a-fA-F]+\s+refs/tags/([^/^]+)(\^\{\})?$")
 
@@ -81,22 +84,36 @@ def gitlab_tags(args, pkgs):
     return gitlab(args, pkgs, "repository/tags", "name")
 
 
-def github(args, pkgs, type="releases", field="tag_name"):
+async def fetch(name, url, headers=None):
+    return (name, await asession.get(url, headers=headers))
+
+
+async def agithub(args, pkgs, type="releases", field="tag_name"):
     res = {}
     arg_github_token = args["github_token"]
+    aws = []
     for name, pkg in pkgs.items():
         id_ = pkg.get("github")
         if id_:
-            headers = {}
+            headers = None
             if arg_github_token:
                 headers = {"Authorization": f"token {arg_github_token}"}
-            r = session.get(f"{github_base}/{id_}/{type}", headers=headers).json()
-            if r:
-                vers = [x[field] for x in r if field in x]
-                vers = try_parse_versions(vers)
-                if vers:
-                    res[name] = vers[-1]
+            aws.append(fetch(name, f"{github_base}/{id_}/{type}", headers=headers))
+    done, _ = await asyncio.wait(aws)
+    for t in done:
+        name, r = t.result()
+        j = await r.json()
+        if j:
+            vers = [x[field] for x in j if field in x]
+            vers = try_parse_versions(vers)
+            if vers:
+                res[name] = vers[-1]
     return res
+
+
+def github(args, pkgs, type="releases", field="tag_name"):
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(agithub(args, pkgs, type, field))
 
 
 def github_tags(args, pkgs):
