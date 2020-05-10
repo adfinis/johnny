@@ -6,14 +6,13 @@ import json
 import re
 import sys
 from itertools import groupby
-from subprocess import check_output
+from urllib.parse import urlparse
 
 import aiohttp
 import click
 import requests
 import toml
 from packaging import version
-from requests.exceptions import InvalidSchema
 
 github_base = "https://api.github.com/repos"
 gitlab_base = "https://gitlab.com"
@@ -25,6 +24,25 @@ session = requests.Session()
 tag_match = re.compile(r"^[0-9a-fA-F]+\s+refs/tags/([^/^]+)(\^\{\})?$")
 
 
+def eprint(*args, **kwargs):
+    print(*args, file=sys.stderr, **kwargs)
+
+
+def try_parse_versions(versions):
+    res = []
+    for ver in versions:
+        ver = ver.strip("v")
+        ver = version.parse(ver)
+        if not isinstance(ver, version.LegacyVersion):
+            ver = version.parse(ver.base_version)
+            res.append(ver)
+    return sorted(res)
+
+
+async def fetch(name, url, headers=None):
+    return (name, await asession.get(url, headers=headers))
+
+
 def git_get_version(line):
     m = tag_match.match(line)
     if m:
@@ -32,34 +50,41 @@ def git_get_version(line):
     return None
 
 
-def git(args, pkgs):
+def agit(args, pkgs):
     res = {}
+    aws = []
+    back = []
     for name, pkg in pkgs.items():
         primary = pkg.get("primary")
         base = pkg.get("url")
         if base and primary == "git":
             vers = set()
-            try:
-                r = session.get(f"{base}/info/refs?service=git-upload-pack")
-                for line in r.text.splitlines():
-                    tag = git_get_version(line)
-                    if tag:
-                        vers.add(tag)
-            except InvalidSchema:
-                eprint("Fallback to git-cli")
-                out = check_output(["git", "ls-remote", "--tags", base]).decode("UTF-8")
-                for line in out.splitlines():
-                    tag = git_get_version(line)
-                    if tag:
-                        vers.add(tag)
-            vers = try_parse_versions(vers)
-            if vers:
-                res[name] = vers[-1]
+            u = urlparse(base)
+            if u.scheme in ("http", "https"):
+                aws.append(fetch(name, f"{base}/info/refs?service=git-upload-pack"))
+
+    done, _ = await asyncio.wait(aws)
+    for t in done:
+        name, r = t.result()
+        for line in r.text.splitlines():
+            tag = git_get_version(line)
+            if tag:
+                vers.add(tag)
+    vers = try_parse_versions(vers)
+    if vers:
+        res[name] = vers[-1]
     return res
+    # out = check_output(["git", "ls-remote", "--tags", base]).decode("UTF-8")
 
 
-def gitlab(args, pkgs, type="releases", field="tag_name"):
+def git(args, pkgs):
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(agit(args, pkgs))
+
+
+async def agitlab(args, pkgs, type="releases", field="tag_name"):
     res = {}
+    aws = []
     arg_gitlab_token = args["gitlab_token"]
     for name, pkg in pkgs.items():
         id_ = pkg.get("gitlab")
@@ -69,29 +94,34 @@ def gitlab(args, pkgs, type="releases", field="tag_name"):
             headers = {}
             if arg_gitlab_token and base == github_base:
                 headers = {"Private-Token": f"token {arg_gitlab_token}"}
-            r = session.get(
-                f"{base}/api/v4/projects/{id_}/{type}", headers=headers
-            ).json()
-            if r:
-                vers = [x[field] for x in r if field in x]
-                vers = try_parse_versions(vers)
-                if vers:
-                    res[name] = vers[-1]
+            aws.append(
+                fetch(name, f"{base}/api/v4/projects/{id_}/{type}", headers=headers)
+            )
+    done, _ = await asyncio.wait(aws)
+    for t in done:
+        name, r = t.result()
+        j = await r.json()
+        if j:
+            vers = [x[field] for x in j if field in x]
+            vers = try_parse_versions(vers)
+            if vers:
+                res[name] = vers[-1]
     return res
+
+
+def gitlab(args, pkgs, type="releases", field="tag_name"):
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(agitlab(args, pkgs, type, field))
 
 
 def gitlab_tags(args, pkgs):
     return gitlab(args, pkgs, "repository/tags", "name")
 
 
-async def fetch(name, url, headers=None):
-    return (name, await asession.get(url, headers=headers))
-
-
 async def agithub(args, pkgs, type="releases", field="tag_name"):
     res = {}
-    arg_github_token = args["github_token"]
     aws = []
+    arg_github_token = args["github_token"]
     for name, pkg in pkgs.items():
         id_ = pkg.get("github")
         if id_:
@@ -120,30 +150,41 @@ def github_tags(args, pkgs):
     return github(args, pkgs, "tags", "name")
 
 
-def arch(args, pkgs):
+async def aarch(args, pkgs):
     res = {}
+    aws = []
     for name, pkg in pkgs.items():
         id_ = pkg.get("arch", name)
-        r = session.get(f"{arch_base}/?name={id_}").json()
-        r = r["results"]
-        if r:
-            vers = try_parse_versions([r[0]["pkgver"]])
+        r = aws.append(fetch(name, f"{arch_base}/?name={id_}"))
+    done, _ = await asyncio.wait(aws)
+    for t in done:
+        name, r = t.result()
+        j = await r.json()
+        j = j["results"]
+        if j:
+            vers = try_parse_versions([j[0]["pkgver"]])
             if vers:
                 res[name] = vers[0]
     return res
 
 
-def aur(args, pkgs):
+def arch(args, pkgs):
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(aarch(args, pkgs))
+
+
+async def aaur(args, pkgs):
     query = []
     items = list(pkgs.items())
     for name, pkg in items:
         id_ = pkg.get("aur", name)
         query.append(f"arg[]={id_}")
     query = "&".join(query)
-    r = session.get(f"{aur_base}/?v=5&type=info&{query}").json()
-    r = r["results"]
+    _, r = await fetch("aur", f"{aur_base}/?v=5&type=info&{query}")
+    j = await r.json()
+    j = j["results"]
     res = {}
-    for i, v in enumerate(r):
+    for i, v in enumerate(j):
         if v:
             vers = try_parse_versions([v["Version"]])
             if vers:
@@ -151,26 +192,16 @@ def aur(args, pkgs):
     return res
 
 
+def aur(args, pkgs):
+    loop = asyncio.get_event_loop()
+    return loop.run_until_complete(aaur(args, pkgs))
+
+
 sources_list = [github, gitlab, aur, arch]
 sources = {x.__name__: x for x in sources_list}
 sources["github_tags"] = github_tags
 sources["gitlab_tags"] = gitlab_tags
 sources["git"] = git
-
-
-def eprint(*args, **kwargs):
-    print(*args, file=sys.stderr, **kwargs)
-
-
-def try_parse_versions(versions):
-    res = []
-    for ver in versions:
-        ver = ver.strip("v")
-        ver = version.parse(ver)
-        if not isinstance(ver, version.LegacyVersion):
-            ver = version.parse(ver.base_version)
-            res.append(ver)
-    return sorted(res)
 
 
 def update(old, new):

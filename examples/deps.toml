@@ -1,12 +1,16 @@
 [johnny_config]
 print_names = true
 
-[keyfinder-cli]
-current = "1.1.1"
-primary = "github_tags"
-github = "EvanPurkhiser/keyfinder-cli"
+# [keyfinder-cli]
+# current = "1.1.1"
+# primary = "github_tags"
+# github = "EvanPurkhiser/keyfinder-cli"
+# 
+# [libkeyfinder]
+# current = "2.2.1"
+# primary = "github"
+# github = "ibsh/libKeyFinder"
 
-[libkeyfinder]
-current = "2.2.1"
-primary = "github"
-github = "ibsh/libKeyFinder"
+[coreutils]
+current = "1"
+primary = "arch"
