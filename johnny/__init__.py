@@ -306,9 +306,27 @@ async def get_vers(args, c):
         await asession.close()
 
 
+def filter_vers(vers, c):
+    new = dict()
+    for k, v in vers.items():
+        conf = c.get(k)
+        found = False
+        if conf:
+            current = conf.get("current")
+            if current:
+                current = version.parse(current)
+                found = True
+                if v > current:
+                    new[k] = {"current": str(current), "actual": str(v)}
+        if not found:
+            new[k] = v
+    return new
+
+
 defaults = {
     "primary": True,
     "secondary": True,
+    "filter": False,
     "trust_primary": True,
     "trust_secondary": True,
     "print_names": False,
@@ -348,6 +366,11 @@ def read_config(args, config):
     help="trust secondary sources",
 )
 @click.option(
+    "--filter/--no-filter",
+    default=None,
+    help="only return newer versions than current",
+)
+@click.option(
     "--print-names/--no-print-names",
     default=None,
     help="print package names instead of count",
@@ -363,7 +386,11 @@ def cli(config, **kwargs):
         del c["johnny_config"]
     loop = asyncio.get_event_loop()
     vers, left = loop.run_until_complete(get_vers(kwargs, c))
-    print(json.dumps(make_serializable((vers))))
+    if kwargs["filter"]:
+        vers = filter_vers(vers, c)
+        print(json.dumps(vers))
+    else:
+        print(json.dumps(make_serializable((vers))))
     if left:
         sys.exit(1)
 
