@@ -13,6 +13,7 @@ import click
 import toml
 from packaging import version
 
+parallelism = 100
 github_base = "https://api.github.com/repos"
 gitlab_base = "https://gitlab.com"
 arch_base = "https://www.archlinux.org/packages/search/json"
@@ -20,6 +21,8 @@ aur_base = "https://aur.archlinux.org/rpc"
 
 asession = aiohttp.ClientSession()
 tag_match = re.compile(r"^[0-9a-fA-F]+\s+refs/tags/([^/^]+)(\^\{\})?$")
+
+fetch_sem = asyncio.Semaphore(value=parallelism)
 
 
 def eprint(*args, **kwargs):
@@ -38,8 +41,9 @@ def try_parse_versions(versions):
 
 
 async def fetch(name, url, headers=None):
-    r = await asession.get(url, headers=headers)
-    r = await r.text()
+    async with fetch_sem:
+        r = await asession.get(url, headers=headers)
+        r = await r.text()
     return (name, r)
 
 
