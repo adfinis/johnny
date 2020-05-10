@@ -19,7 +19,7 @@ gitlab_base = "https://gitlab.com"
 arch_base = "https://www.archlinux.org/packages/search/json"
 aur_base = "https://aur.archlinux.org/rpc"
 
-asession = aiohttp.ClientSession()
+asession = None
 tag_match = re.compile(r"^[0-9a-fA-F]+\s+refs/tags/([^/^]+)(\^\{\})?$")
 
 fetch_sem = asyncio.Semaphore(value=parallelism)
@@ -284,7 +284,8 @@ async def get_secondary(args, c, vers, asked, left):
 
 
 async def get_vers(args, c):
-    try:
+    global asession
+    async with aiohttp.ClientSession() as asession:
         arg_primary = args["primary"]
         arg_secondary = args["secondary"]
         arg_trust_primary = args["trust_primary"]
@@ -302,8 +303,6 @@ async def get_vers(args, c):
         if left:
             eprint(f"Packages left: {left}")
         return vers, left
-    finally:
-        await asession.close()
 
 
 def filter_vers(vers, c):
