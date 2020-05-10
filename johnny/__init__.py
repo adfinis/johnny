@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 
 import aiohttp
 import click
-import requests
 import toml
 from packaging import version
 
@@ -20,7 +19,6 @@ arch_base = "https://www.archlinux.org/packages/search/json"
 aur_base = "https://aur.archlinux.org/rpc"
 
 asession = aiohttp.ClientSession()
-session = requests.Session()
 tag_match = re.compile(r"^[0-9a-fA-F]+\s+refs/tags/([^/^]+)(\^\{\})?$")
 
 
@@ -40,7 +38,9 @@ def try_parse_versions(versions):
 
 
 async def fetch(name, url, headers=None):
-    return (name, await asession.get(url, headers=headers))
+    r = await asession.get(url, headers=headers)
+    r = await r.text()
+    return (name, r)
 
 
 def git_get_version(line):
@@ -50,10 +50,9 @@ def git_get_version(line):
     return None
 
 
-def agit(args, pkgs):
+async def git(args, pkgs):
     res = {}
     aws = []
-    back = []
     for name, pkg in pkgs.items():
         primary = pkg.get("primary")
         base = pkg.get("url")
@@ -62,11 +61,12 @@ def agit(args, pkgs):
             u = urlparse(base)
             if u.scheme in ("http", "https"):
                 aws.append(fetch(name, f"{base}/info/refs?service=git-upload-pack"))
-
+    if not aws:
+        return {}
     done, _ = await asyncio.wait(aws)
     for t in done:
         name, r = t.result()
-        for line in r.text.splitlines():
+        for line in r.splitlines():
             tag = git_get_version(line)
             if tag:
                 vers.add(tag)
@@ -77,12 +77,7 @@ def agit(args, pkgs):
     # out = check_output(["git", "ls-remote", "--tags", base]).decode("UTF-8")
 
 
-def git(args, pkgs):
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(agit(args, pkgs))
-
-
-async def agitlab(args, pkgs, type="releases", field="tag_name"):
+async def gitlab(args, pkgs, type="releases", field="tag_name"):
     res = {}
     aws = []
     arg_gitlab_token = args["gitlab_token"]
@@ -97,10 +92,12 @@ async def agitlab(args, pkgs, type="releases", field="tag_name"):
             aws.append(
                 fetch(name, f"{base}/api/v4/projects/{id_}/{type}", headers=headers)
             )
+    if not aws:
+        return {}
     done, _ = await asyncio.wait(aws)
     for t in done:
         name, r = t.result()
-        j = await r.json()
+        j = json.loads(r)
         if j:
             vers = [x[field] for x in j if field in x]
             vers = try_parse_versions(vers)
@@ -109,16 +106,11 @@ async def agitlab(args, pkgs, type="releases", field="tag_name"):
     return res
 
 
-def gitlab(args, pkgs, type="releases", field="tag_name"):
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(agitlab(args, pkgs, type, field))
+async def gitlab_tags(args, pkgs):
+    return await gitlab(args, pkgs, "repository/tags", "name")
 
 
-def gitlab_tags(args, pkgs):
-    return gitlab(args, pkgs, "repository/tags", "name")
-
-
-async def agithub(args, pkgs, type="releases", field="tag_name"):
+async def github(args, pkgs, type="releases", field="tag_name"):
     res = {}
     aws = []
     arg_github_token = args["github_token"]
@@ -129,10 +121,12 @@ async def agithub(args, pkgs, type="releases", field="tag_name"):
             if arg_github_token:
                 headers = {"Authorization": f"token {arg_github_token}"}
             aws.append(fetch(name, f"{github_base}/{id_}/{type}", headers=headers))
+    if not aws:
+        return {}
     done, _ = await asyncio.wait(aws)
     for t in done:
         name, r = t.result()
-        j = await r.json()
+        j = json.loads(r)
         if j:
             vers = [x[field] for x in j if field in x]
             vers = try_parse_versions(vers)
@@ -141,25 +135,22 @@ async def agithub(args, pkgs, type="releases", field="tag_name"):
     return res
 
 
-def github(args, pkgs, type="releases", field="tag_name"):
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(agithub(args, pkgs, type, field))
+async def github_tags(args, pkgs):
+    return await github(args, pkgs, "tags", "name")
 
 
-def github_tags(args, pkgs):
-    return github(args, pkgs, "tags", "name")
-
-
-async def aarch(args, pkgs):
+async def arch(args, pkgs):
     res = {}
     aws = []
     for name, pkg in pkgs.items():
         id_ = pkg.get("arch", name)
         r = aws.append(fetch(name, f"{arch_base}/?name={id_}"))
+    if not aws:
+        return {}
     done, _ = await asyncio.wait(aws)
     for t in done:
         name, r = t.result()
-        j = await r.json()
+        j = json.loads(r)
         j = j["results"]
         if j:
             vers = try_parse_versions([j[0]["pkgver"]])
@@ -168,12 +159,7 @@ async def aarch(args, pkgs):
     return res
 
 
-def arch(args, pkgs):
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(aarch(args, pkgs))
-
-
-async def aaur(args, pkgs):
+async def aur(args, pkgs):
     query = []
     items = list(pkgs.items())
     for name, pkg in items:
@@ -181,7 +167,7 @@ async def aaur(args, pkgs):
         query.append(f"arg[]={id_}")
     query = "&".join(query)
     _, r = await fetch("aur", f"{aur_base}/?v=5&type=info&{query}")
-    j = await r.json()
+    j = json.loads(r)
     j = j["results"]
     res = {}
     for i, v in enumerate(j):
@@ -190,11 +176,6 @@ async def aaur(args, pkgs):
             if vers:
                 res[items[i][0]] = vers[0]
     return res
-
-
-def aur(args, pkgs):
-    loop = asyncio.get_event_loop()
-    return loop.run_until_complete(aaur(args, pkgs))
 
 
 sources_list = [github, gitlab, aur, arch]
@@ -237,18 +218,28 @@ def status(args, source, query, new, all):
         )
 
 
-def get_primary(args, c, vers):
+async def do_get_primary(args, vers, s, x, k):
+    return (args, vers, x, k, await s(args, x))
+
+
+async def get_primary(args, c, vers):
     primary = [(k, v) for k, v in c.items() if "primary" in v]
     primary = sorted(primary, key=lambda i: i[1]["primary"])
     primary = groupby(primary, key=lambda i: i[1]["primary"])
     vers = dict(vers)
     asked = set()
+    aws = []
     for k, g in primary:
         g = list(g)
         x = dict(g)
         asked.add(k)
         s = sources[k]
-        new = s(args, x)
+        aws.append(do_get_primary(args, vers, s, x, k))
+    if not aws:
+        return vers, asked
+    done, _ = await asyncio.wait(aws)
+    for t in done:
+        args, vers, x, k, new = t.result()
         vers = update(vers, new)
         status(args, k, x, new, len(vers))
     return vers, asked
@@ -285,24 +276,27 @@ def get_secondary(args, c, vers, asked, left):
     return vers, left
 
 
-def get_vers(args, c):
-    arg_primary = args["primary"]
-    arg_secondary = args["secondary"]
-    arg_trust_primary = args["trust_primary"]
-    vers = {}
-    asked = set()
-    if arg_primary:
-        vers, asked = get_primary(args, c, vers)
-    if arg_trust_primary:
-        left = {k: v for k, v in c.items() if k not in vers}
-    else:
-        left = dict(c)
-    if arg_secondary and left:
-        vers, left = get_secondary(args, c, vers, asked, left)
-    left = ", ".join([k for k in left.keys()])
-    if left:
-        eprint(f"Packages left: {left}")
-    return vers, left
+async def get_vers(args, c):
+    try:
+        arg_primary = args["primary"]
+        arg_secondary = args["secondary"]
+        arg_trust_primary = args["trust_primary"]
+        vers = {}
+        asked = set()
+        if arg_primary:
+            vers, asked = await get_primary(args, c, vers)
+        if arg_trust_primary:
+            left = {k: v for k, v in c.items() if k not in vers}
+        else:
+            left = dict(c)
+        if arg_secondary and left:
+            vers, left = get_secondary(args, c, vers, asked, left)
+        left = ", ".join([k for k in left.keys()])
+        if left:
+            eprint(f"Packages left: {left}")
+        return vers, left
+    finally:
+        await asession.close()
 
 
 defaults = {
@@ -360,7 +354,8 @@ def cli(config, **kwargs):
     kwargs = read_config(kwargs, jc)
     if jc:
         del c["johnny_config"]
-    vers, left = get_vers(kwargs, c)
+    loop = asyncio.get_event_loop()
+    vers, left = loop.run_until_complete(get_vers(kwargs, c))
     print(json.dumps(make_serializable((vers))))
     if left:
         sys.exit(1)
